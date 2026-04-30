@@ -10,6 +10,7 @@ public class LytixWindow : EditorWindow
 {
     private static List<List<LytixEntry.Entry>> entriesByFile = new List<List<LytixEntry.Entry>>();
     private static List<List<Vector3>> trailsByFile = new List<List<Vector3>>();
+    private static List<LytixEntry.Entry> cachedEntries = new List<LytixEntry.Entry>();
 
     private static readonly Color[] playerPalette = { Color.red, Color.cyan, Color.green, Color.yellow, Color.magenta };
 
@@ -30,6 +31,25 @@ public class LytixWindow : EditorWindow
     {
         SceneView.duringSceneGui -= OnSceneGUI;
     }
+    private static List<LytixEntry.Entry> FlattenEntries(List<List<LytixEntry.Entry>> data)
+    {
+        return data.SelectMany(file => file).ToList();
+    }
+    void Test()
+    {
+        HashSet<string> argnames = new HashSet<string>();
+
+        foreach (var entry in cachedEntries)
+        {
+            entry.args?.Keys.ToList().ForEach(k => argnames.Add(k));
+        }
+
+
+        foreach (var argname in argnames)
+        {
+            Debug.Log(argname); 
+        }
+    }
 
     private void OnGUI()
     {
@@ -41,6 +61,9 @@ public class LytixWindow : EditorWindow
         //stuff here
 
         DrawReloadButton();
+
+        if (GUILayout.Button("test"))
+            Test    ();
 
         GUILayout.Label("Toggles", EditorStyles.miniBoldLabel);
         LytixSettings.Set("Lytix.ShowGhostTrails", EditorGUILayout.Toggle(new GUIContent("Show Ghost Trails", "Draws a trail for each player file loaded."), LytixSettings.Get<bool>("Lytix.ShowGhostTrails")));
@@ -114,7 +137,7 @@ public class LytixWindow : EditorWindow
     {
         List<List<LytixEntry.Entry>> data = LytixGlobals.LoadFromFolder();
 
-        //cachedEntries = FlattenEntries(data);
+        cachedEntries = FlattenEntries(data);
         entriesByFile = data;
 
         trailsByFile = data
