@@ -1,25 +1,22 @@
 ﻿using LytixInternal;
-using PlasticGui;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
-// Simple editor window for Lytix
-// Persists its input using LytixSettings (ProjectSettings-backed JSON store)
+
 public class LytixWindow : EditorWindow
 {
     private static List<List<LytixEntry.Entry>> entriesByFile = new List<List<LytixEntry.Entry>>();
-    private static List<List<Vector3>> trailsByFile = new List<List<Vector3>>();
-    private static List<LytixEntry.Entry> cachedEntries = new List<LytixEntry.Entry>();
+    private static List<List<Vector3>>          trailsByFile  = new List<List<Vector3>>();
+    private static List<LytixEntry.Entry>        cachedEntries = new List<LytixEntry.Entry>();
+
+    // ── Filter window reference ────────────────────────────────────────────
+    private LytixFilterWindow _filterWindow;
 
     private static readonly Color[] playerPalette = { Color.red, Color.cyan, Color.green, Color.yellow, Color.magenta };
 
     [MenuItem("Window/Lytix")]
-    public static void OpenWindow()
-    {
-        GetWindow<LytixWindow>("Lytix Window");
-    }
-
+    public static void OpenWindow() => GetWindow<LytixWindow>("Lytix Window");
 
     void OnEnable()
     {
@@ -31,45 +28,38 @@ public class LytixWindow : EditorWindow
     {
         SceneView.duringSceneGui -= OnSceneGUI;
     }
+
     private static List<LytixEntry.Entry> FlattenEntries(List<List<LytixEntry.Entry>> data)
-    {
-        return data.SelectMany(file => file).ToList();
-    }
+        => data.SelectMany(f => f).ToList();
+
     void Test()
     {
-        HashSet<string> argnames = new HashSet<string>();
-
+        var argnames = new HashSet<string>();
         foreach (var entry in cachedEntries)
-        {
             entry.args?.Keys.ToList().ForEach(k => argnames.Add(k));
-        }
-
 
         foreach (var argname in argnames)
-        {
-            Debug.Log(argname); 
-        }
+            Debug.Log(argname);
     }
 
     private void OnGUI()
     {
         GUILayout.Label("Lytix Window", EditorStyles.boldLabel);
-
         EditorGUILayout.Space();
 
         EditorGUI.BeginChangeCheck();
-        //stuff here
 
         DrawReloadButton();
+        DrawFilterWindowButton();   // ← new
 
         if (GUILayout.Button("test"))
-            Test    ();
+            Test();
 
         GUILayout.Label("Toggles", EditorStyles.miniBoldLabel);
-        LytixSettings.Set("Lytix.ShowGhostTrails", EditorGUILayout.Toggle(new GUIContent("Show Ghost Trails", "Draws a trail for each player file loaded."), LytixSettings.Get<bool>("Lytix.ShowGhostTrails")));
-        LytixSettings.Set("Lytix.ShowHeatMap", EditorGUILayout.Toggle(new GUIContent("Show Heat Map", "Overlays a heatmap showing where players spent the most time."), LytixSettings.Get<bool>("Lytix.ShowHeatMap")));
-        LytixSettings.Set("Lytix.ShowFeedbackNotes", EditorGUILayout.Toggle(new GUIContent("Show Feedback Notes", "Displays in-world labels for any feedback notes recorded."), LytixSettings.Get<bool>("Lytix.ShowFeedbackNotes")));
-        LytixSettings.Set("Lytix.ShowEvents", EditorGUILayout.Toggle(new GUIContent("Show Events", "Renders clickable events, each showing individual event data."), LytixSettings.Get<bool>("Lytix.ShowEvents")));
+        LytixSettings.Set("Lytix.ShowGhostTrails",    EditorGUILayout.Toggle(new GUIContent("Show Ghost Trails",    "Draws a trail for each player file loaded."),                LytixSettings.Get<bool>("Lytix.ShowGhostTrails")));
+        LytixSettings.Set("Lytix.ShowHeatMap",         EditorGUILayout.Toggle(new GUIContent("Show Heat Map",        "Overlays a heatmap showing where players spent the most time."), LytixSettings.Get<bool>("Lytix.ShowHeatMap")));
+        LytixSettings.Set("Lytix.ShowFeedbackNotes",   EditorGUILayout.Toggle(new GUIContent("Show Feedback Notes",  "Displays in-world labels for any feedback notes recorded."),  LytixSettings.Get<bool>("Lytix.ShowFeedbackNotes")));
+        LytixSettings.Set("Lytix.ShowEvents",          EditorGUILayout.Toggle(new GUIContent("Show Events",          "Renders clickable events, each showing individual event data."), LytixSettings.Get<bool>("Lytix.ShowEvents")));
 
         GUILayout.Space(4);
         GUILayout.Label("Settings", EditorStyles.miniBoldLabel);
@@ -82,14 +72,12 @@ public class LytixWindow : EditorWindow
         LytixSettings.Set("Lytix.FeedbackPreviewLength",
             EditorGUILayout.IntSlider(
                 new GUIContent("Feedback Preview Chars", "How many characters of a feedback note are shown in the scene view before truncating."),
-                LytixSettings.Get<int>("Lytix.FeedbackPreviewLength", 60), // value first
-                1, 20));                                                     // then min, max
+                LytixSettings.Get<int>("Lytix.FeedbackPreviewLength", 60), 1, 20));
 
         LytixSettings.Set("Lytix.RenderRadius",
             EditorGUILayout.Slider(
                 new GUIContent("Render Radius", "Only show events and feedback within this distance from the Scene camera."),
-                LytixSettings.Get<float>("Lytix.RenderRadius", 100f), // value first
-                1f, 500f));                                            // then min, max
+                LytixSettings.Get<float>("Lytix.RenderRadius", 100f), 1f, 500f));
 
         LytixSettings.Set("Lytix.DataPointsPerSecond",
             EditorGUILayout.FloatField(
@@ -99,8 +87,7 @@ public class LytixWindow : EditorWindow
         LytixSettings.Set("Lytix.GhostTrailThickness",
             EditorGUILayout.Slider(
                 new GUIContent("Trail Thickness", "Controls the thickness of all ghost trail lines in the scene view."),
-                LytixSettings.Get<float>("Lytix.GhostTrailThickness", 1f), // value first
-                1f, 10f));                                                   // then min, max
+                LytixSettings.Get<float>("Lytix.GhostTrailThickness", 1f), 1f, 10f));
 
         GUILayout.Space(6);
 
@@ -111,27 +98,52 @@ public class LytixWindow : EditorWindow
         }
 
         EditorGUILayout.Space();
-
     }
+
+    // ── Buttons ─────────────────────────────────────────────────────────────
 
     private void DrawReloadButton()
     {
-        GUIStyle reloadStyle = new GUIStyle(GUI.skin.button)
+        GUIStyle style = new GUIStyle(GUI.skin.button)
         {
-            fontSize = 13,
-            fontStyle = FontStyle.Bold,
+            fontSize    = 13,
+            fontStyle   = FontStyle.Bold,
             fixedHeight = 46f,
-            alignment = TextAnchor.MiddleCenter,
+            alignment   = TextAnchor.MiddleCenter,
         };
 
-        Color prevBg = GUI.backgroundColor;
+        Color prev = GUI.backgroundColor;
         GUI.backgroundColor = new Color(0f, 1f, 0.35f, 1f);
-
-        if (GUILayout.Button("↺  Refresh Data", reloadStyle))
+        if (GUILayout.Button("↺  Refresh Data", style))
             ReloadData();
-
-        GUI.backgroundColor = prevBg;
+        GUI.backgroundColor = prev;
     }
+
+    private void DrawFilterWindowButton()
+    {
+        GUIStyle style = new GUIStyle(GUI.skin.button)
+        {
+            fontSize    = 12,
+            fixedHeight = 28f,
+            alignment   = TextAnchor.MiddleCenter,
+        };
+
+        Color prev = GUI.backgroundColor;
+        GUI.backgroundColor = new Color(0.4f, 0.7f, 1f, 1f);
+        if (GUILayout.Button("⚙  Open Filter Window", style))
+            OpenFilterWindow();
+        GUI.backgroundColor = prev;
+    }
+
+    // ── Filter window ────────────────────────────────────────────────────────
+
+    private void OpenFilterWindow()
+    {
+        _filterWindow = LytixFilterWindow.Open();
+        _filterWindow.Refresh(cachedEntries);
+    }
+
+    // ── Data ─────────────────────────────────────────────────────────────────
 
     public void ReloadData()
     {
@@ -147,8 +159,14 @@ public class LytixWindow : EditorWindow
                 .ToList())
             .ToList();
 
+        // Keep the filter window in sync if it is already open
+        if (_filterWindow != null)
+            _filterWindow.Refresh(cachedEntries);
+
         RepaintScene();
     }
+
+    // ── Scene drawing ─────────────────────────────────────────────────────────
 
     private static void RepaintScene() => SceneView.RepaintAll();
     private static List<Vector3> temporalTrail = new List<Vector3>();
@@ -163,7 +181,7 @@ public class LytixWindow : EditorWindow
 
         for (int i = 0; i < trailsByFile.Count; i++)
         {
-            if (trailActive && i != activeFileIndex) continue; // ← changed line
+            if (trailActive && i != activeFileIndex) continue;
 
             List<Vector3> trail = trailsByFile[i];
             if (trail == null || trail.Count == 0) continue;
@@ -172,8 +190,8 @@ public class LytixWindow : EditorWindow
             Handles.DrawAAPolyLine(LineTex, LytixSettings.Get<float>("Lytix.GhostTrailThickness", 1f), trail.ToArray());
         }
     }
-    private static Texture2D _lineTex;
 
+    private static Texture2D _lineTex;
     private static Texture2D LineTex
     {
         get
@@ -188,9 +206,5 @@ public class LytixWindow : EditorWindow
         }
     }
 
-
-    static void OnSceneGUI(SceneView sceneView)
-    {
-        DrawGhostTrails();
-    }
+    static void OnSceneGUI(SceneView sceneView) => DrawGhostTrails();
 }
