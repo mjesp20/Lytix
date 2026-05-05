@@ -4,6 +4,8 @@ using System.Linq;
 using LytixInternal;
 using UnityEditor;
 using UnityEngine;
+using FilterOperator = LytixInternal.LytixGlobals.FilterOperator;
+using FlagFilter     = LytixInternal.LytixGlobals.FlagFilter;
 
 // ---------------------------------------------------------------------------
 //  LytixFilterWindow
@@ -13,25 +15,6 @@ using UnityEngine;
 // ---------------------------------------------------------------------------
 public class LytixFilterWindow : EditorWindow
 {
-    // -----------------------------------------------------------------------
-    //  Types  (mirrors the old QATool types – keep in sync or share via a
-    //          common static class)
-    // -----------------------------------------------------------------------
-    public enum FilterOperator
-    {
-        Ignore, Equal, NotEqual,
-        GreaterThan, GreaterThanOrEqual,
-        LessThan, LessThanOrEqual
-    }
-
-    public class FlagFilter
-    {
-        public bool           enabled;
-        public FilterOperator op;
-        public object         value;
-    }
-
-    // Operator labels shown in the UI
     private static readonly Dictionary<FilterOperator, string> OpLabel =
         new Dictionary<FilterOperator, string>
         {
@@ -70,8 +53,9 @@ public class LytixFilterWindow : EditorWindow
     // value: inferred System.Type (int, float, bool, string …)
     private Dictionary<string, Type> _argTypes = new Dictionary<string, Type>();
 
-    // key  : "ScriptName.VarName"
-    private Dictionary<string, FlagFilter> _filters = new Dictionary<string, FlagFilter>();
+    // Backed by LytixGlobals so FilterEntry can read it without any reference
+    // to this window.
+    private Dictionary<string, FlagFilter> _filters => LytixGlobals.FlagFilters;
 
     // key  : "ScriptName"  →  foldout open?
     private Dictionary<string, bool> _foldouts = new Dictionary<string, bool>();
@@ -93,8 +77,6 @@ public class LytixFilterWindow : EditorWindow
     // -----------------------------------------------------------------------
     //  Static entry points
     // -----------------------------------------------------------------------
-
-    [MenuItem("Lytix/Filter Window")]
     public static LytixFilterWindow Open()
     {
         var win = GetWindow<LytixFilterWindow>("Lytix Filters");
@@ -416,12 +398,8 @@ public class LytixFilterWindow : EditorWindow
         return dot >= 0 ? fullKey[(dot + 1)..] : fullKey;
     }
 
-    private static object NormalizeType(object input) => input switch
-    {
-        long   l => (int)l,
-        double d => (float)d,
-        _        => input
-    };
+    // NormalizeType lives in LytixGlobals – call it from there.
+    private static object NormalizeType(object input) => LytixGlobals.NormalizeType(input);
 
     private static bool IsNumeric(Type t) =>
         t == typeof(int) || t == typeof(float) || t == typeof(double) || t == typeof(long);

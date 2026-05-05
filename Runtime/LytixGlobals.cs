@@ -13,6 +13,37 @@ namespace LytixInternal
         public static string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         public static string folderPath = Path.Combine(documentsPath, name, Application.productName);
 
+        // ── Filter types ───────────────────────────────────────────────────────
+
+        public enum FilterOperator
+        {
+            Ignore, Equal, NotEqual,
+            GreaterThan, GreaterThanOrEqual,
+            LessThan, LessThanOrEqual
+        }
+
+        public class FlagFilter
+        {
+            public bool           enabled;
+            public FilterOperator op;
+            public object         value;
+        }
+
+        /// <summary>
+        /// Live filter state. LytixFilterWindow reads and writes this directly;
+        /// FilterEntry consults it on every parse.
+        /// </summary>
+        public static Dictionary<string, FlagFilter> FlagFilters = new Dictionary<string, FlagFilter>();
+
+        /// <summary>Normalises JSON numeric types to int/float so comparisons work.</summary>
+        public static object NormalizeType(object input) => input switch
+        {
+            long   l => (int)l,
+            double d => (float)d,
+            _        => input
+        };
+
+        // ── JSON settings ──────────────────────────────────────────────────────
 
         static JsonSerializerSettings settings = new JsonSerializerSettings
         {
@@ -47,7 +78,7 @@ namespace LytixInternal
                 throw new Exception("File not found");
             }
             List<LytixEntry.Entry> parsedLines = new List<LytixEntry.Entry>();
-            foreach (string entry in File.ReadLines(filePath))
+            foreach (string entry in File.ReadLines(filePath).Skip(1)) // Skip header
             {
                 parsedLines.Add(ParseLine(entry));
             }
@@ -72,97 +103,58 @@ namespace LytixInternal
 
         private static LytixEntry.Entry FilterEntry(LytixEntry.Entry entry)
         {
-            return entry; //todo
-            /*
+            if (entry?.args == null)
+                return entry;
+
             foreach (KeyValuePair<string, object> arg in entry.args)
             {
-                if (arg.Key == "note" || arg.Key == "event" || arg.Key == "prompt")
-                {
-                    continue;
-                }
-
-                var flags = QAToolGlobals.flagTypes ?? new Dictionary<string, Type>();
-
-
-                if (!flags.ContainsKey(arg.Key))
-                {
-                    object normalized = QAToolGlobals.NormalizeType(arg.Value);
-                    flags[arg.Key] = normalized != null ? normalized.GetType() : typeof(object);
-                }
-
-
-                QAToolGlobals.flagTypes = flags;
-
-                if (!QAToolGlobals.FlagFilters.ContainsKey(arg.Key))
+                if (!FlagFilters.TryGetValue(arg.Key, out FlagFilter filter))
                     continue;
 
-                QAToolGlobals.FlagFilter filter = QAToolGlobals.FlagFilters[arg.Key];
-
-                if (!filter.enabled)
+                if (!filter.enabled || filter.op == FilterOperator.Ignore)
                     continue;
 
-                // If filter value is null, skip comparison
-                if (filter.value == null)
+                if (filter.value == null || arg.Value == null)
                     continue;
 
-                if (arg.Value == null)
-                    continue;
-
-                object entryVal = QAToolGlobals.NormalizeType(arg.Value);
-                object filterVal = QAToolGlobals.NormalizeType(filter.value);
+                object entryVal  = NormalizeType(arg.Value);
+                object filterVal = NormalizeType(filter.value);
 
                 if (filterVal == null)
                     continue;
 
-
-                // Both must be IComparable for ordered comparisons
                 IComparable comparable = entryVal as IComparable;
-
-                bool pass = true;
+                bool pass;
 
                 switch (filter.op)
                 {
-                    case QAToolGlobals.FilterOperator.Ignore:
-                        pass = true;
-                        break;
-
-                    case QAToolGlobals.FilterOperator.Equal:
+                    case FilterOperator.Equal:
                         pass = entryVal?.Equals(filterVal) ?? false;
                         break;
-
-                    case QAToolGlobals.FilterOperator.NotEqual:
+                    case FilterOperator.NotEqual:
                         pass = !(entryVal?.Equals(filterVal) ?? false);
                         break;
-
-                    case QAToolGlobals.FilterOperator.GreaterThan:
+                    case FilterOperator.GreaterThan:
                         pass = comparable != null && comparable.CompareTo(filterVal) > 0;
                         break;
-
-                    case QAToolGlobals.FilterOperator.GreaterThanOrEqual:
+                    case FilterOperator.GreaterThanOrEqual:
                         pass = comparable != null && comparable.CompareTo(filterVal) >= 0;
                         break;
-
-                    case QAToolGlobals.FilterOperator.LessThan:
+                    case FilterOperator.LessThan:
                         pass = comparable != null && comparable.CompareTo(filterVal) < 0;
                         break;
-
-                    case QAToolGlobals.FilterOperator.LessThanOrEqual:
+                    case FilterOperator.LessThanOrEqual:
                         pass = comparable != null && comparable.CompareTo(filterVal) <= 0;
                         break;
-
                     default:
                         pass = true;
                         break;
                 }
 
-                // If any active filter fails, discard the entry
                 if (!pass) return null;
             }
 
             return entry;
-        
-            */
         }
     }
 }
-
