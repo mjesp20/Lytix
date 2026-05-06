@@ -182,10 +182,12 @@ public class LytixWindow : EditorWindow
         GUILayout.Space(4);
         GUILayout.Label("Display", EditorStyles.miniBoldLabel);
 
+/*
         LytixSettings.Set("Lytix.FeedbackKeyCode",
             EditorGUILayout.TextField(
                 new GUIContent("Feedback Key", "The key players press in-game to submit a feedback note."),
                 LytixSettings.Get<string>("Lytix.FeedbackKeyCode")));
+*/
 
         LytixSettings.Set("Lytix.FeedbackPreviewLength",
             EditorGUILayout.IntSlider(

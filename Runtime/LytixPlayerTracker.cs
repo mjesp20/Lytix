@@ -7,6 +7,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 using TMPro;
 using Newtonsoft.Json;
@@ -35,6 +36,9 @@ public class LytixPlayerTracker : MonoBehaviour
     private List<string> batch = new List<string>();
 
 
+
+    private PlayerInputActions inputActions;
+
     private static LytixPlayerTracker _instance;
     public static LytixPlayerTracker Instance
     {
@@ -48,6 +52,22 @@ public class LytixPlayerTracker : MonoBehaviour
             }
             return _instance;
         }
+    }
+
+    private void Awake()
+    {
+        inputActions = new PlayerInputActions();
+    }
+
+        private void OnEnable()
+    {
+        inputActions.Player.Enable();
+        inputActions.Player.LytixFeedbackNote.performed += ctx => CreateFeedbackNotesWindow();
+    }
+
+        private void OnDisable()
+    {
+        inputActions.Player.Disable();
     }
 
     void Start()
@@ -362,7 +382,7 @@ private bool showingFeedbackNoteWindow;
             dict["prompt"] = prompt;
         }
 
-        WriteData(LytixJSONTypes.Event, dict);
+        WriteData(LytixJSONTypes.FeedbackNote, dict);
         Destroy(feedbackPanel);
         showingFeedbackNoteWindow = false;
         Cursor.visible = cursorInitiallyVisible;
