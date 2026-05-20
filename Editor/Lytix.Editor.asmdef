@@ -1,0 +1,12 @@
+{
+    "name": "Lytix.Editor",
+    "references": [
+        "Lytix.Runtime",
+        "Newtonsoft.Json"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "autoReferenced": true
+}

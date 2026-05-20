@@ -1,0 +1,9 @@
+{
+    "name": "Lytix.Runtime",
+    "references": [
+        "Newtonsoft.Json"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "autoReferenced": true
+}
