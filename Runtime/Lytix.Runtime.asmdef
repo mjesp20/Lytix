@@ -1,7 +1,9 @@
 {
     "name": "Lytix.Runtime",
     "references": [
-        "Newtonsoft.Json"
+        "Newtonsoft.Json",
+        "Unity.TextMeshPro",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

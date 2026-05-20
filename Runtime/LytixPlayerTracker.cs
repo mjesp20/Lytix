@@ -36,7 +36,7 @@ public class LytixPlayerTracker : MonoBehaviour
 
 
 
-    private PlayerInputActions inputActions;
+    //private PlayerInputActions inputActions;
 
     private static LytixPlayerTracker _instance;
     public static LytixPlayerTracker Instance
@@ -55,18 +55,18 @@ public class LytixPlayerTracker : MonoBehaviour
 
     private void Awake()
     {
-        inputActions = new PlayerInputActions();
+        //inputActions = new PlayerInputActions();
     }
 
     private void OnEnable()
     {
-        inputActions.Player.Enable();
-        inputActions.Player.LytixFeedbackNote.performed += ctx => CreateFeedbackNotesWindow();
+        //inputActions.Player.Enable();
+        //inputActions.Player.LytixFeedbackNote.performed += ctx => CreateFeedbackNotesWindow();
     }
 
     private void OnDisable()
     {
-        inputActions.Player.Disable();
+        //inputActions.Player.Disable();
     }
 
     void Start()

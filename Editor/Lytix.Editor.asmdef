@@ -2,7 +2,8 @@
     "name": "Lytix.Editor",
     "references": [
         "Lytix.Runtime",
-        "Newtonsoft.Json"
+        "Newtonsoft.Json",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Editor"
