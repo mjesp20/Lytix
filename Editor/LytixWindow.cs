@@ -6,21 +6,17 @@ using UnityEngine;
 
 public class LytixWindow : EditorWindow
 {
-    // ──────────────────────────────────────────────
-    //  Scene data
-    // ──────────────────────────────────────────────
+
+    // entry data stores
 
     private static List<List<LytixEntry.Entry>> entriesByFile = new List<List<LytixEntry.Entry>>();
-    private static List<List<Vector3>>          trailsByFile  = new List<List<Vector3>>();
-    private static List<LytixEntry.Entry>        cachedEntries = new List<LytixEntry.Entry>();
+    private static List<List<Vector3>> trailsByFile = new List<List<Vector3>>();
+    private static List<LytixEntry.Entry> cachedEntries = new List<LytixEntry.Entry>();
 
     private static readonly Color[] playerPalette = { Color.red, Color.cyan, Color.green, Color.yellow, Color.magenta };
 
-    // ──────────────────────────────────────────────
     //  Candidate caches
-    //  Rebuilt on data load, trail change, or
-    //  feedbackPreviewLength change — not every frame
-    // ──────────────────────────────────────────────
+    //  Rebuilt on data load or trail focus change
 
     private static List<(LytixEntry.Entry entry, int fileIndex)> _eventCandidates
         = new List<(LytixEntry.Entry, int)>();
@@ -28,27 +24,24 @@ public class LytixWindow : EditorWindow
     private static List<(LytixEntry.Entry entry, string preview, string fullText)> _feedbackCandidates
         = new List<(LytixEntry.Entry, string, string)>();
 
-    // ──────────────────────────────────────────────
+
     //  Heatmap state
-    // ──────────────────────────────────────────────
 
-    private static Dictionary<Vector3Int, int>           _heatmap         = new Dictionary<Vector3Int, int>();
-    private static float                                  _lastHeatmapCellSize = -1f;
+    private static Dictionary<Vector3Int, int> _heatmap = new Dictionary<Vector3Int, int>();
+    private static float _lastHeatmapCellSize = -1f;
 
-    // Percentile thresholds — computed once, not every frame
-    private static int   _cachedMinThreshold;
-    private static int   _cachedMaxThreshold;
+    // Percentile thresholds (computed once, not every frame)
+    private static int _cachedMinThreshold;
+    private static int _cachedMaxThreshold;
     private static float _cachedLogMin;
     private static float _cachedLogMax;
 
-    // Back-to-front sorted cell list — only rebuilds when camera moves far enough
-    private static List<KeyValuePair<Vector3Int, int>> _sortedCells    = new List<KeyValuePair<Vector3Int, int>>();
-    private static Vector3                              _lastSortCamPos = Vector3.positiveInfinity;
-    private const  float                               SortRebuildThreshold = 1f;
+    // Back-to-front sorted cell list
+    private static List<KeyValuePair<Vector3Int, int>> _sortedCells = new List<KeyValuePair<Vector3Int, int>>();
+    private static Vector3 _lastSortCamPos = Vector3.positiveInfinity;
+    private const float SortRebuildThreshold = 1f;
 
-    // ──────────────────────────────────────────────
-    //  Line texture
-    // ──────────────────────────────────────────────
+    //  Line texture for temporal (i think)
 
     private static Texture2D _lineTex;
     private static Texture2D LineTex
@@ -65,9 +58,8 @@ public class LytixWindow : EditorWindow
         }
     }
 
-    // ──────────────────────────────────────────────
-    //  Cached GUI styles
-    // ──────────────────────────────────────────────
+
+    // base GUI styles
 
     private static GUIStyle _feedbackLabelStyle;
     private static GUIStyle _feedbackOutlineStyle;
@@ -76,34 +68,27 @@ public class LytixWindow : EditorWindow
     private static GUIStyle _eventAbbrStyle;
     private static GUIStyle _eventAbbrOutlineStyle;
 
-    // ──────────────────────────────────────────────
+
     //  Temporal trail state
-    // ──────────────────────────────────────────────
 
-    private static List<Vector3> temporalTrail  = new List<Vector3>();
-    public  static int           activeFileIndex = 0;
-    private static int           scrubIndex      = 0;
-    private static bool          isPreview       = true;
+    private static List<Vector3> temporalTrail = new List<Vector3>();
+    public static int activeFileIndex = 0;
+    private static int scrubIndex = 0;
+    private static bool isPreview = true;
 
-    // ──────────────────────────────────────────────
     //  Editor state
-    // ──────────────────────────────────────────────
 
     private LytixFilterWindow _filterWindow;
-    private int               _lastHotControl;
+    private int _lastHotControl;
 
-    // ──────────────────────────────────────────────
     //  Foldout state
-    // ──────────────────────────────────────────────
 
-    private bool _foldVisualisation  = true;
-    private bool _foldHeatmap        = true;
-    private bool _foldTracking       = true;
-    private bool _foldTemporalTrail  = true;
+    private bool _foldVisualisation = true;
+    private bool _foldHeatmap = true;
+    private bool _foldTracking = true;
+    private bool _foldTemporalTrail = true;
 
-    // ──────────────────────────────────────────────
     //  Lifecycle
-    // ──────────────────────────────────────────────
 
     [MenuItem("Window/Lytix")]
     public static void OpenWindow() => GetWindow<LytixWindow>("Lytix Window");
@@ -119,9 +104,7 @@ public class LytixWindow : EditorWindow
         SceneView.duringSceneGui -= OnSceneGUI;
     }
 
-    // ──────────────────────────────────────────────
     //  GUI
-    // ──────────────────────────────────────────────
 
     private void OnGUI()
     {
@@ -131,11 +114,13 @@ public class LytixWindow : EditorWindow
 
         DrawReloadButton();
         GUILayout.Space(4);
-        
+
         if (GUILayout.Button("Filters")) OpenFilterWindow();
 
 
         DrawHorizontalLine();
+
+        #region tabs
 
         // ── Visualisation ──────────────────────────
         GUILayout.Space(4);
@@ -156,6 +141,7 @@ public class LytixWindow : EditorWindow
         GUILayout.Space(4);
         DrawTemporalTrailSection();
     }
+    #endregion
 
     // ──────────────────────────────────────────────
     //  GUI sections
@@ -167,27 +153,20 @@ public class LytixWindow : EditorWindow
 
         GUILayout.Label("Toggles", EditorStyles.miniBoldLabel);
         LytixSettings.Set("Lytix.ShowGhostTrails",
-            EditorGUILayout.Toggle(new GUIContent("Show Ghost Trails",   "Draws a trail for each player file loaded."),
+            EditorGUILayout.Toggle(new GUIContent("Show Ghost Trails", "Draws a trail for each player file loaded."),
                 LytixSettings.Get<bool>("Lytix.ShowGhostTrails")));
         LytixSettings.Set("Lytix.ShowHeatMap",
-            EditorGUILayout.Toggle(new GUIContent("Show Heat Map",       "Overlays a heatmap showing where players spent the most time."),
+            EditorGUILayout.Toggle(new GUIContent("Show Heat Map", "Overlays a heatmap showing where players spent the most time."),
                 LytixSettings.Get<bool>("Lytix.ShowHeatMap")));
         LytixSettings.Set("Lytix.ShowFeedbackNotes",
             EditorGUILayout.Toggle(new GUIContent("Show Feedback Notes", "Displays in-world labels for any feedback notes recorded."),
                 LytixSettings.Get<bool>("Lytix.ShowFeedbackNotes")));
         LytixSettings.Set("Lytix.ShowEvents",
-            EditorGUILayout.Toggle(new GUIContent("Show Events",         "Renders clickable events, each showing individual event data."),
+            EditorGUILayout.Toggle(new GUIContent("Show Events", "Renders clickable events, each showing individual event data."),
                 LytixSettings.Get<bool>("Lytix.ShowEvents")));
 
         GUILayout.Space(4);
         GUILayout.Label("Display", EditorStyles.miniBoldLabel);
-
-/*
-        LytixSettings.Set("Lytix.FeedbackKeyCode",
-            EditorGUILayout.TextField(
-                new GUIContent("Feedback Key", "The key players press in-game to submit a feedback note."),
-                LytixSettings.Get<string>("Lytix.FeedbackKeyCode")));
-*/
 
         LytixSettings.Set("Lytix.FeedbackPreviewLength",
             EditorGUILayout.IntSlider(
@@ -250,9 +229,7 @@ public class LytixWindow : EditorWindow
 
         bool anyHeatmapChanged = EditorGUI.EndChangeCheck();
 
-        // ── Slider-release detection ────────────────
-        // Only rebuild the grid (expensive) when the user releases the cell-size
-        // slider, not on every dragged tick.
+        // Slider release detection
         bool controlJustReleased = _lastHotControl != 0 && GUIUtility.hotControl == 0;
 
         if (controlJustReleased)
@@ -260,15 +237,14 @@ public class LytixWindow : EditorWindow
             float currentCellSize = LytixSettings.Get<float>("Lytix.HeatmapCellSize", 1f);
 
             if (!Mathf.Approximately(currentCellSize, _lastHeatmapCellSize))
-                LoadHeatmap();       // full grid + threshold rebuild
+                LoadHeatmap();
             else
-                ComputeHeatmapThresholds(); // percentile sliders only
+                ComputeHeatmapThresholds();
 
             RepaintScene();
         }
         else if (anyHeatmapChanged)
         {
-            // Opacity / contrast — just repaint, no rebuild needed
             RepaintScene();
         }
 
@@ -277,8 +253,6 @@ public class LytixWindow : EditorWindow
 
     private void DrawTrackingControls()
     {
-        // Changes here are read by the runtime tracker — no reload needed,
-        // just persist them so the next session picks them up.
         LytixSettings.Set("Lytix.ServerTracking",
             EditorGUILayout.Toggle(
                 new GUIContent("Server Tracking", "Send telemetry to a remote server in addition to local files."),
@@ -361,14 +335,10 @@ public class LytixWindow : EditorWindow
         if (newIndex != scrubIndex)
         {
             scrubIndex = newIndex;
-            isPreview  = false;
+            isPreview = false;
             RepaintScene();
         }
     }
-
-    // ──────────────────────────────────────────────
-    //  Layout helpers
-    // ──────────────────────────────────────────────
 
     private void DrawSection(string title, ref bool foldout, System.Action drawContent)
     {
@@ -394,10 +364,10 @@ public class LytixWindow : EditorWindow
     {
         GUIStyle style = new GUIStyle(GUI.skin.button)
         {
-            fontSize    = 13,
-            fontStyle   = FontStyle.Bold,
+            fontSize = 13,
+            fontStyle = FontStyle.Bold,
             fixedHeight = 46f,
-            alignment   = TextAnchor.MiddleCenter,
+            alignment = TextAnchor.MiddleCenter,
         };
 
         Color prev = GUI.backgroundColor;
@@ -407,9 +377,6 @@ public class LytixWindow : EditorWindow
         GUI.backgroundColor = prev;
     }
 
-    // ──────────────────────────────────────────────
-    //  Filter window
-    // ──────────────────────────────────────────────
 
     private void OpenFilterWindow()
     {
@@ -417,9 +384,6 @@ public class LytixWindow : EditorWindow
         _filterWindow.Refresh(cachedEntries);
     }
 
-    // ──────────────────────────────────────────────
-    //  Scene rendering
-    // ──────────────────────────────────────────────
 
     static void OnSceneGUI(SceneView sceneView)
     {
@@ -468,10 +432,10 @@ public class LytixWindow : EditorWindow
         Camera cam = SceneView.currentDrawingSceneView?.camera;
         if (cam == null) return;
 
-        float   cellSize = LytixSettings.Get<float>("Lytix.HeatmapCellSize", 1f);
-        float   opacity  = LytixSettings.Get<float>("Lytix.HeatmapOpacity",  0.6f);
-        float   contrast = LytixSettings.Get<float>("Lytix.HeatmapContrast", 1f);
-        Vector3 camPos   = cam.transform.position;
+        float cellSize = LytixSettings.Get<float>("Lytix.HeatmapCellSize", 1f);
+        float opacity = LytixSettings.Get<float>("Lytix.HeatmapOpacity", 0.6f);
+        float contrast = LytixSettings.Get<float>("Lytix.HeatmapContrast", 1f);
+        Vector3 camPos = cam.transform.position;
 
         if (Vector3.Distance(camPos, _lastSortCamPos) > SortRebuildThreshold)
         {
@@ -485,7 +449,7 @@ public class LytixWindow : EditorWindow
         {
             if (kvp.Value < _cachedMinThreshold || kvp.Value > _cachedMaxThreshold) continue;
 
-            float logRange   = Mathf.Log(_cachedLogMax - _cachedLogMin + 2f);
+            float logRange = Mathf.Log(_cachedLogMax - _cachedLogMin + 2f);
             float normalized = logRange > 0f
                 ? Mathf.Log(kvp.Value - _cachedLogMin + 2f) / logRange
                 : 0f;
@@ -505,20 +469,22 @@ public class LytixWindow : EditorWindow
         Handles.color = color;
 
         Vector3 p000 = center + new Vector3(-h, -h, -h);
-        Vector3 p001 = center + new Vector3(-h, -h,  h);
-        Vector3 p010 = center + new Vector3(-h,  h, -h);
-        Vector3 p011 = center + new Vector3(-h,  h,  h);
-        Vector3 p100 = center + new Vector3( h, -h, -h);
-        Vector3 p101 = center + new Vector3( h, -h,  h);
-        Vector3 p110 = center + new Vector3( h,  h, -h);
-        Vector3 p111 = center + new Vector3( h,  h,  h);
+        Vector3 p001 = center + new Vector3(-h, -h, h);
+        Vector3 p010 = center + new Vector3(-h, h, -h);
+        Vector3 p011 = center + new Vector3(-h, h, h);
+        Vector3 p100 = center + new Vector3(h, -h, -h);
+        Vector3 p101 = center + new Vector3(h, -h, h);
+        Vector3 p110 = center + new Vector3(h, h, -h);
+        Vector3 p111 = center + new Vector3(h, h, h);
 
-        Handles.DrawAAConvexPolygon(p010, p110, p111, p011); // Top
+        Handles.DrawAAConvexPolygon(p010, p110, p111, p011); // top
         Handles.DrawAAConvexPolygon(p000, p001, p101, p100); // Bottom
         Handles.DrawAAConvexPolygon(p001, p011, p111, p101); // Front  (+Z)
-        Handles.DrawAAConvexPolygon(p000, p100, p110, p010); // Back   (-Z)
-        Handles.DrawAAConvexPolygon(p000, p010, p011, p001); // Left   (-X)
-        Handles.DrawAAConvexPolygon(p100, p101, p111, p110); // Right  (+X)
+        Handles.DrawAAConvexPolygon(p000, p100, p110, p010); // back   (-Z)
+        Handles.DrawAAConvexPolygon(p000, p010, p011, p001); // left   (-X)
+        Handles.DrawAAConvexPolygon(p100, p101, p111, p110); // right  (+X)
+
+        //this reads crazy but works trust
     }
 
     private static Vector3 CellCenter(Vector3Int cell, float cellSize) =>
@@ -550,7 +516,7 @@ public class LytixWindow : EditorWindow
             Vector2 screenPos = HandleUtility.WorldToGUIPoint(worldPos + Vector3.up * 0.4f);
 
             GUIContent content = new GUIContent(preview);
-            Vector2 size       = _feedbackLabelStyle.CalcSize(content);
+            Vector2 size = _feedbackLabelStyle.CalcSize(content);
 
             Rect rect = new Rect(
                 screenPos.x - size.x * 0.5f,
@@ -570,7 +536,7 @@ public class LytixWindow : EditorWindow
 
         Handles.EndGUI();
 
-        // ── 3D wire cubes at feedback positions ──
+        // 3d wire cube thingie
         if (Event.current.type != EventType.Repaint) return;
 
         Handles.color = Color.white;
@@ -593,13 +559,12 @@ public class LytixWindow : EditorWindow
         Camera sceneCamera = SceneView.currentDrawingSceneView?.camera;
         if (sceneCamera == null) return;
 
-        float   renderRadius = LytixSettings.Get<float>("Lytix.RenderRadius", 100f);
-        Vector3 camPos       = sceneCamera.transform.position;
-        bool    isRepaint    = Event.current.type == EventType.Repaint;
+        float renderRadius = LytixSettings.Get<float>("Lytix.RenderRadius", 100f);
+        Vector3 camPos = sceneCamera.transform.position;
+        bool isRepaint = Event.current.type == EventType.Repaint;
 
         EnsureStyles();
 
-        // ── 3D geometry ─────────────────────────────
         if (isRepaint)
         {
             var sorted = _eventCandidates
@@ -613,8 +578,8 @@ public class LytixWindow : EditorWindow
 
             foreach (var (entry, fileIndex) in sorted)
             {
-                Vector3 pos   = entry.position.ToVector3();
-                Color   color = playerPalette[fileIndex % playerPalette.Length];
+                Vector3 pos = entry.position.ToVector3();
+                Color color = playerPalette[fileIndex % playerPalette.Length];
 
                 Handles.color = color;
                 Handles.DrawWireCube(pos, Vector3.one * 0.5f);
@@ -622,7 +587,7 @@ public class LytixWindow : EditorWindow
             }
         }
 
-        // ── Labels + click handling ──────────────────
+        // click handling
         Handles.BeginGUI();
 
         foreach (var (entry, fileIndex) in _eventCandidates)
@@ -635,18 +600,18 @@ public class LytixWindow : EditorWindow
             if (!entry.args.TryGetValue("event", out object evt) || evt == null) continue;
 
             string evtName = evt.ToString();
-            string abbr    = evtName.Length > 2 ? evtName.Substring(0, 2).ToUpper() : evtName.ToUpper();
-            Color  color   = playerPalette[fileIndex % playerPalette.Length];
+            string abbr = evtName.Length > 2 ? evtName.Substring(0, 2).ToUpper() : evtName.ToUpper();
+            Color color = playerPalette[fileIndex % playerPalette.Length];
 
             Vector2 screenTop = HandleUtility.WorldToGUIPoint(pos + Vector3.up * 0.5f);
             Vector2 screenMid = HandleUtility.WorldToGUIPoint(pos);
 
-            // Name label
-            _eventLabelStyle.normal.textColor        = color;
+            // label
+            _eventLabelStyle.normal.textColor = color;
             _eventLabelOutlineStyle.normal.textColor = Color.black;
 
             GUIContent nameContent = new GUIContent(evtName);
-            Vector2    nameSize    = _eventLabelStyle.CalcSize(nameContent);
+            Vector2 nameSize = _eventLabelStyle.CalcSize(nameContent);
 
             Rect nameRect = new Rect(
                 screenTop.x - nameSize.x * 0.5f,
@@ -655,9 +620,9 @@ public class LytixWindow : EditorWindow
 
             DrawGUIOutlinedLabel(nameRect, nameContent, _eventLabelStyle, _eventLabelOutlineStyle);
 
-            // Abbreviation label
+            // abbr label
             GUIContent abbrContent = new GUIContent(abbr);
-            Vector2    abbrSize    = _eventAbbrStyle.CalcSize(abbrContent);
+            Vector2 abbrSize = _eventAbbrStyle.CalcSize(abbrContent);
 
             Rect abbrRect = new Rect(
                 screenMid.x - abbrSize.x * 0.5f,
@@ -667,7 +632,6 @@ public class LytixWindow : EditorWindow
             _eventAbbrOutlineStyle.normal.textColor = color;
             DrawGUIOutlinedLabel(abbrRect, abbrContent, _eventAbbrStyle, _eventAbbrOutlineStyle);
 
-            // Click area spans both labels
             Rect clickRect = Rect.MinMaxRect(
                 Mathf.Min(nameRect.xMin, abbrRect.xMin),
                 nameRect.yMin,
@@ -690,8 +654,8 @@ public class LytixWindow : EditorWindow
         if (temporalTrail.Count == 0) return;
         if (Event.current.type != EventType.Repaint) return;
 
-        int   drawUpTo   = isPreview ? temporalTrail.Count - 1 : scrubIndex;
-        float thickness  = LytixSettings.Get<float>("Lytix.GhostTrailThickness", 1f) + 3f;
+        int drawUpTo = isPreview ? temporalTrail.Count - 1 : scrubIndex;
+        float thickness = LytixSettings.Get<float>("Lytix.GhostTrailThickness", 1f) + 3f;
 
         Handles.color = Color.white;
 
@@ -702,10 +666,6 @@ public class LytixWindow : EditorWindow
 
         Handles.DrawSolidDisc(temporalTrail[scrubIndex], Vector3.up, 0.2f);
     }
-
-    // ──────────────────────────────────────────────
-    //  GUI helpers
-    // ──────────────────────────────────────────────
 
     private static void DrawGUIOutlinedLabel(Rect rect, GUIContent content, GUIStyle style, GUIStyle outlineStyle)
     {
@@ -721,10 +681,10 @@ public class LytixWindow : EditorWindow
             {
                 fontStyle = FontStyle.Italic,
                 alignment = TextAnchor.MiddleCenter,
-                fontSize  = 11
+                fontSize = 11
             };
             _feedbackLabelStyle.normal.textColor = Color.white;
-            _feedbackLabelStyle.hover.textColor  = Color.white;
+            _feedbackLabelStyle.hover.textColor = Color.white;
         }
 
         if (_feedbackOutlineStyle == null)
@@ -739,7 +699,7 @@ public class LytixWindow : EditorWindow
             {
                 alignment = TextAnchor.MiddleCenter,
                 fontStyle = FontStyle.Bold,
-                fontSize  = 11
+                fontSize = 11
             };
         }
 
@@ -752,7 +712,7 @@ public class LytixWindow : EditorWindow
             {
                 alignment = TextAnchor.MiddleCenter,
                 fontStyle = FontStyle.Bold,
-                fontSize  = 10
+                fontSize = 10
             };
             _eventAbbrStyle.normal.textColor = Color.black;
         }
@@ -760,10 +720,6 @@ public class LytixWindow : EditorWindow
         if (_eventAbbrOutlineStyle == null)
             _eventAbbrOutlineStyle = new GUIStyle(_eventAbbrStyle);
     }
-
-    // ──────────────────────────────────────────────
-    //  Candidate cache builder
-    // ──────────────────────────────────────────────
 
     private static void RebuildCandidateCaches()
     {
@@ -787,7 +743,7 @@ public class LytixWindow : EditorWindow
                      && n != null)
             .Select(e =>
             {
-                string full    = e.args["note"].ToString();
+                string full = e.args["note"].ToString();
                 string preview = full.Length > previewLength
                                   ? full.Substring(0, previewLength) + "…"
                                   : full;
@@ -796,9 +752,6 @@ public class LytixWindow : EditorWindow
             .ToList();
     }
 
-    // ──────────────────────────────────────────────
-    //  Data loading
-    // ──────────────────────────────────────────────
 
     public void ReloadData()
     {
@@ -820,13 +773,12 @@ public class LytixWindow : EditorWindow
         if (_filterWindow != null)
             _filterWindow.Refresh(cachedEntries);
 
-        // Invalidate cached styles so they rebuild cleanly against the current skin
-        _feedbackLabelStyle     = null;
-        _feedbackOutlineStyle   = null;
-        _eventLabelStyle        = null;
+        _feedbackLabelStyle = null;
+        _feedbackOutlineStyle = null;
+        _eventLabelStyle = null;
         _eventLabelOutlineStyle = null;
-        _eventAbbrStyle         = null;
-        _eventAbbrOutlineStyle  = null;
+        _eventAbbrStyle = null;
+        _eventAbbrOutlineStyle = null;
 
         RebuildCandidateCaches();
         LoadHeatmap();
@@ -836,9 +788,6 @@ public class LytixWindow : EditorWindow
     private static List<LytixEntry.Entry> FlattenEntries(List<List<LytixEntry.Entry>> data)
         => data.SelectMany(f => f).ToList();
 
-    // ──────────────────────────────────────────────
-    //  Heatmap building
-    // ──────────────────────────────────────────────
 
     private static void LoadHeatmap()
     {
@@ -846,13 +795,13 @@ public class LytixWindow : EditorWindow
 
         float cellSize = LytixSettings.Get<float>("Lytix.HeatmapCellSize", 1f);
         _lastHeatmapCellSize = cellSize;
-        _lastSortCamPos      = Vector3.positiveInfinity;
+        _lastSortCamPos = Vector3.positiveInfinity;
 
         foreach (LytixEntry.Entry entry in cachedEntries)
         {
             if (entry?.position == null) continue;
 
-            Vector3    pos  = entry.position.ToVector3();
+            Vector3 pos = entry.position.ToVector3();
             Vector3Int cell = new Vector3Int(
                 Mathf.FloorToInt(pos.x / cellSize),
                 Mathf.FloorToInt(pos.y / cellSize),
@@ -870,7 +819,7 @@ public class LytixWindow : EditorWindow
         if (_heatmap.Count == 0) return;
 
         List<int> sorted = _heatmap.Values.OrderBy(v => v).ToList();
-        int       total  = sorted.Count;
+        int total = sorted.Count;
 
         float rawMin = LytixSettings.Get<float>("Lytix.HeatmapMinPercentile", 0f);
         float rawMax = LytixSettings.Get<float>("Lytix.HeatmapMaxPercentile", 1f);
@@ -880,22 +829,20 @@ public class LytixWindow : EditorWindow
 
         _cachedMinThreshold = sorted[minIdx];
         _cachedMaxThreshold = sorted[maxIdx];
-        _cachedLogMin       = Mathf.Max(1, _cachedMinThreshold);
-        _cachedLogMax       = Mathf.Max(_cachedLogMin + 1, _cachedMaxThreshold);
+        _cachedLogMin = Mathf.Max(1, _cachedMinThreshold);
+        _cachedLogMax = Mathf.Max(_cachedLogMin + 1, _cachedMaxThreshold);
     }
 
-    // ──────────────────────────────────────────────
-    //  Temporal trail helpers
-    // ──────────────────────────────────────────────
+
 
     private static void LoadFileAtIndex(int index)
     {
         if (trailsByFile.Count == 0 || index < 0 || index >= trailsByFile.Count) return;
 
         activeFileIndex = index;
-        temporalTrail   = trailsByFile[index];
-        scrubIndex      = 0;
-        isPreview       = true;
+        temporalTrail = trailsByFile[index];
+        scrubIndex = 0;
+        isPreview = true;
 
         RebuildCandidateCaches();
         RepaintScene();
@@ -903,10 +850,10 @@ public class LytixWindow : EditorWindow
 
     private static void UnloadTemporalTrail()
     {
-        temporalTrail   = new List<Vector3>();
+        temporalTrail = new List<Vector3>();
         activeFileIndex = 0;
-        scrubIndex      = 0;
-        isPreview       = true;
+        scrubIndex = 0;
+        isPreview = true;
 
         RebuildCandidateCaches();
         RepaintScene();
@@ -914,18 +861,9 @@ public class LytixWindow : EditorWindow
 
     public static void SelectFile(int index) => LoadFileAtIndex(index);
 
-    // ──────────────────────────────────────────────
-    //  Utilities
-    // ──────────────────────────────────────────────
+
 
     private static void RepaintScene() => SceneView.RepaintAll();
 
-    void Test()
-    {
-        var argnames = new HashSet<string>();
-        foreach (var entry in cachedEntries)
-            entry.args?.Keys.ToList().ForEach(k => argnames.Add(k));
-        foreach (var argname in argnames)
-            Debug.Log(argname);
-    }
+
 }

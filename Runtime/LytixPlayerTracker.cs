@@ -7,7 +7,6 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
 
 using TMPro;
 using Newtonsoft.Json;
@@ -59,13 +58,13 @@ public class LytixPlayerTracker : MonoBehaviour
         inputActions = new PlayerInputActions();
     }
 
-        private void OnEnable()
+    private void OnEnable()
     {
         inputActions.Player.Enable();
         inputActions.Player.LytixFeedbackNote.performed += ctx => CreateFeedbackNotesWindow();
     }
 
-        private void OnDisable()
+    private void OnDisable()
     {
         inputActions.Player.Disable();
     }
@@ -124,9 +123,6 @@ public class LytixPlayerTracker : MonoBehaviour
         sampleTimer += delta;
         flushTimer += delta;
 
-        // ----------------------------
-        // SAMPLE DATA (X per second)
-        // ----------------------------
         while (sampleTimer >= sampleInterval)
         {
             sampleTimer -= sampleInterval;
@@ -134,9 +130,7 @@ public class LytixPlayerTracker : MonoBehaviour
             WriteData(LytixJSONTypes.Movement, null);
         }
 
-        // ----------------------------
-        // FLUSH BATCH (Y seconds)
-        // ----------------------------
+        // dump batch (every x seconds)
         if (flushTimer >= batchFrequency)
         {
             flushTimer -= batchFrequency;
@@ -170,7 +164,7 @@ public class LytixPlayerTracker : MonoBehaviour
             if (kvp.Key == "playerPosition")
             {
                 if (trackPosition)
-                    entry["position"] = SanitizeValue(kvp.Value); // SanitizeValue should return {x,y,z} dict � see below
+                    entry["position"] = SanitizeValue(kvp.Value); // SanitizeValue returns {x,y,z} dict
                 continue;
             }
             ;
@@ -178,8 +172,6 @@ public class LytixPlayerTracker : MonoBehaviour
             argsDict[kvp.Key] = SanitizeValue(kvp.Value);
         }
 
-
-   
 
         if (args != null)
             foreach (var kv in args)
@@ -197,14 +189,16 @@ public class LytixPlayerTracker : MonoBehaviour
     {
         return value switch
         {
-            // Primitives � Newtonsoft handles these natively, pass through as-is
+            //easy values
             int or float or double or bool or string or long => value,
-            // Known Unity structs � convert to named object to preserve x/y/z JSON structure
+
+            //store unity types as dicts
             Vector2 v => new { x = v.x, y = v.y },
             Vector3 v => new { x = v.x, y = v.y, z = v.z },
             Vector4 v => new { x = v.x, y = v.y, z = v.z, w = v.w },
             Quaternion q => new { x = q.x, y = q.y, z = q.z, w = q.w },
-            // Fallback � stringify rather than let Newtonsoft choke on it
+
+            //unknown type invoke tostring (or null as string if its null value)
             _ => value?.ToString() ?? "null"
         };
     }
@@ -224,17 +218,17 @@ public class LytixPlayerTracker : MonoBehaviour
         FlushBatch();
         writer?.Close();
     }
-    public void Event(Dictionary<string,object> args)
+    public void Event(Dictionary<string, object> args)
     {
         WriteData(LytixJSONTypes.Event, args);
     }
 
-        public void CreateFeedbackNotesWindow(string prompt = null, Color? accentColor = null)
+    public void CreateFeedbackNotesWindow(string prompt = null, Color? accentColor = null)
     {
         showingFeedbackNoteWindow = true;
 
         Color accent = accentColor ?? new Color(0f, 0.8f, 0.4f, 1f);
-        
+
         EventSystem eventSystem = FindFirstObjectByType<EventSystem>();
         if (eventSystem == null)
         {
@@ -250,7 +244,7 @@ public class LytixPlayerTracker : MonoBehaviour
             {
                 canvas = cv;
                 break;
-            }   
+            }
         }
         if (canvas == null)
         {
@@ -327,9 +321,9 @@ public class LytixPlayerTracker : MonoBehaviour
         inputField.textViewport = textArea.GetComponent<RectTransform>();
         inputField.textComponent = text;
         inputField.placeholder = placeholder;
-        
+
         StartCoroutine(FocusInputField(inputField));
-        
+
         // Submit button
         submitButton = new GameObject("SubmitButton").AddComponent<Button>();
         submitButton.transform.SetParent(feedbackPanel.transform, false);
@@ -356,8 +350,8 @@ public class LytixPlayerTracker : MonoBehaviour
         submitButton.onClick.AddListener(() => { SubmitNote(inputField, prompt); });
     }
     private GameObject feedbackPanel;
-private Button submitButton;
-private bool showingFeedbackNoteWindow;
+    private Button submitButton;
+    private bool showingFeedbackNoteWindow;
     float timeScale;
     bool cursorInitiallyVisible;
     CursorLockMode cursorMode;

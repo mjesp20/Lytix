@@ -1,9 +1,6 @@
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.IO;
-using System.Xml;
-using UnityEngine;
-using LytixInternal;
 
 public static class LytixSettings
 {
@@ -12,9 +9,6 @@ public static class LytixSettings
     private static Dictionary<string, object> _data;
     private static bool _loaded;
 
-    // -------------------------
-    // Public API
-    // -------------------------
 
     public static void Set(string key, object value)
     {
@@ -55,9 +49,8 @@ public static class LytixSettings
             Save();
     }
 
-    // -------------------------
     // Internal load/save
-    // -------------------------
+
 
     private static void EnsureLoaded()
     {

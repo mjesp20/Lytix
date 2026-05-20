@@ -13,7 +13,7 @@ namespace LytixInternal
         public static string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         public static string folderPath = Path.Combine(documentsPath, name, Application.productName);
 
-        // ── Filter types ───────────────────────────────────────────────────────
+        // filters
 
         public enum FilterOperator
         {
@@ -29,13 +29,11 @@ namespace LytixInternal
             public object         value;
         }
 
-        /// <summary>
-        /// Live filter state. LytixFilterWindow reads and writes this directly;
-        /// FilterEntry consults it on every parse.
-        /// </summary>
+
+        //filter state.
         public static Dictionary<string, FlagFilter> FlagFilters = new Dictionary<string, FlagFilter>();
 
-        /// <summary>Normalises JSON numeric types to int/float so comparisons work.</summary>
+        //Normalises JSON numeric types to readable 32 bit types
         public static object NormalizeType(object input) => input switch
         {
             long   l => (int)l,
@@ -43,7 +41,7 @@ namespace LytixInternal
             _        => input
         };
 
-        // ── JSON settings ──────────────────────────────────────────────────────
+        // avoid "culture issues" (denmark uses , while everyone else uses .)
 
         static JsonSerializerSettings settings = new JsonSerializerSettings
         {

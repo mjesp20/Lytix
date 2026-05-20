@@ -6,16 +6,16 @@ namespace LytixInternal
     public class LytixFeedbackInspectorWindow : EditorWindow
     {
         private LytixEntry.Entry _entry;
-        private string                     _fullNote;
-        private Vector2                    _scroll;
-    
+        private string _fullNote;
+        private Vector2 _scroll;
+
         public static void Show(LytixEntry.Entry entry, string fullNote)
         {
             var win = GetWindow<LytixFeedbackInspectorWindow>(true, "Feedback Note", true);
-            win._entry    = entry;
+            win._entry = entry;
             win._fullNote = fullNote;
-            win._scroll   = Vector2.zero;
-            win.minSize   = new Vector2(320, 200);
+            win._scroll = Vector2.zero;
+            win.minSize = new Vector2(320, 200);
             win.Show();
         }
 
@@ -27,7 +27,6 @@ namespace LytixInternal
             GUILayout.Label("Feedback Note", EditorStyles.boldLabel);
             DrawLine();
 
-            // Position
             GUILayout.Space(4);
             GUILayout.Label("Position", EditorStyles.miniBoldLabel);
             Vector3 pos = _entry.position.ToVector3();
@@ -44,7 +43,7 @@ namespace LytixInternal
             GUILayout.Label(_fullNote, EditorStyles.wordWrappedLabel);
             EditorGUILayout.EndScrollView();
 
-            // Any other args
+            // other args
             if (_entry.args != null && _entry.args.Count > 1)
             {
                 DrawLine();

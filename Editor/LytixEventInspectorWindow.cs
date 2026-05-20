@@ -7,18 +7,18 @@ namespace LytixInternal
     public class LytixEventInspectorWindow : EditorWindow
     {
         private LytixEntry.Entry _entry;
-        private int    _playerIndex;
-        private Color  _playerColor;
+        private int _playerIndex;
+        private Color _playerColor;
         private Vector2 _scroll;
 
         public static void Show(LytixEntry.Entry entry, int playerIndex, Color playerColor)
         {
             LytixEventInspectorWindow window = GetWindow<LytixEventInspectorWindow>(true, "Event Inspector", true);
-            window._entry       = entry;
+            window._entry = entry;
             window._playerIndex = playerIndex;
             window._playerColor = playerColor;
-            window._scroll      = Vector2.zero;
-            window.minSize      = new Vector2(280, 200);
+            window._scroll = Vector2.zero;
+            window.minSize = new Vector2(280, 200);
             window.Show();
         }
 
@@ -30,7 +30,7 @@ namespace LytixInternal
                 return;
             }
 
-            // ── Player header ──────────────────────────
+
             GUILayout.Space(8);
 
             Rect colorRect = EditorGUILayout.GetControlRect(false, 6f);
@@ -40,7 +40,6 @@ namespace LytixInternal
             GUILayout.Label($"Player {_playerIndex + 1}", EditorStyles.boldLabel);
             DrawHorizontalLine();
 
-            // ── Position ───────────────────────────────
             GUILayout.Space(4);
             GUILayout.Label("Position", EditorStyles.miniBoldLabel);
             Vector3 pos = _entry.position.ToVector3();
@@ -50,7 +49,6 @@ namespace LytixInternal
 
             DrawHorizontalLine();
 
-            // ── Event args ─────────────────────────────
             GUILayout.Space(4);
             GUILayout.Label("Event Data", EditorStyles.miniBoldLabel);
 
